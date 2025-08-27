@@ -1,0 +1,111 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import font_manager
+import matplotlib.pyplot as plt
+
+
+font_path = r"D:\NotoSansCJKsc-hinted\NotoSansCJKsc-Regular.otf"
+fp = font_manager.FontProperties(fname=font_path)
+print("字体家族名:", fp.get_name())  # 应该是 Noto Sans CJK SC
+
+plt.rcParams['font.family'] = fp.get_name()  # 设置全局字体
+
+plt.figure()
+plt.title("中文标题", fontproperties=fp, fontsize=16)
+plt.xlabel("波长（nm）", fontproperties=fp, fontsize=14)
+plt.ylabel("光谱功率", fontproperties=fp, fontsize=14)
+plt.text(400, 0.5, "这是一段中文测试", fontproperties=fp, fontsize=12)
+plt.show()
+
+
+# === 字体加载 ===
+font_path = r"D:\NotoSansCJKsc-hinted\NotoSansCJKsc-Regular.otf"  # 请改成你字体文件的完整路径
+my_font = font_manager.FontProperties(fname=font_path)
+plt.rcParams['font.family'] = my_font.get_name()
+
+# === 读取数据 ===
+df = pd.read_excel('Problem2_LED_SPD.xlsx')
+wavelengths = df['波长'].str.extract(r'(\d+)').astype(int).values.flatten()
+spd_channels = df[['Blue', 'Green', 'Red', 'Warm White', 'Cold White']].to_numpy()
+
+# === 权重 ===
+w_day = np.array([0.112, 0.208, 0.051, 0.329, 0.300])
+w_night = np.array([0.003, 0.042, 0.621, 0.314, 0.020])
+
+# === 合成SPD ===
+spd_day = spd_channels @ w_day
+spd_night = spd_channels @ w_night
+
+# === 配色 ===
+colors = ['#1f77b4', '#2ca02c', '#d62728', '#ff7f0e', '#17becf']
+labels = ['蓝光通道', '绿光通道', '红光通道', '暖白通道', '冷白通道']
+
+# === 图1：单通道SPD ===
+plt.figure(figsize=(10,5))
+for i in range(5):
+    plt.plot(wavelengths, spd_channels[:, i], color=colors[i], label=labels[i], linewidth=1.8)
+plt.title('LED通道光谱功率分布', fontproperties=my_font, fontsize=16)
+plt.xlabel('波长（nm）', fontproperties=my_font, fontsize=14)
+plt.ylabel('相对光谱功率（mW/m²/nm）', fontproperties=my_font, fontsize=14)
+plt.legend(prop=my_font, fontsize=12)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.tick_params(labelsize=12)
+plt.tight_layout()
+plt.show()
+
+# === 图2：合成光谱 ===
+plt.figure(figsize=(10,5))
+plt.plot(wavelengths, spd_day, label='日间模式合成光谱', color='#9467bd', linewidth=2)  # 紫色
+plt.plot(wavelengths, spd_night, label='夜间模式合成光谱', color='#8c564b', linewidth=2)  # 棕色
+plt.title('合成光谱功率分布', fontproperties=my_font, fontsize=16)
+plt.xlabel('波长（nm）', fontproperties=my_font, fontsize=14)
+plt.ylabel('光谱功率（mW/m²/nm）', fontproperties=my_font, fontsize=14)
+plt.legend(prop=my_font, fontsize=12)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.tick_params(labelsize=12)
+plt.tight_layout()
+plt.show()
+
+# === 图3：权重条形图 ===
+x = np.arange(len(labels))
+width = 0.35
+fig, ax = plt.subplots()
+rects1 = ax.bar(x - width/2, w_day, width, label='日间模式', color='#1f77b4')
+rects2 = ax.bar(x + width/2, w_night, width, label='夜间模式', color='#ff7f0e')
+ax.set_xticks(x)
+ax.set_xticklabels(labels, fontproperties=my_font, fontsize=12)
+ax.set_ylabel('权重', fontproperties=my_font, fontsize=14)
+ax.set_title('LED通道权重分布', fontproperties=my_font, fontsize=16)
+ax.legend(prop=my_font, fontsize=12)
+ax.grid(axis='y', linestyle='--', alpha=0.5)
+plt.tight_layout()
+plt.show()
+
+# === 图4：雷达图 ===
+params_day = {'相关色温(CCT)':6002, '色偏(Duv)':0.0012, '保真度指数(Rf)':92.7, '色域指数(Rg)':98.4, '褪黑素日光效率比(mel-DER)':0.87}
+params_night = {'相关色温(CCT)':2895, '色偏(Duv)':0.0038, '保真度指数(Rf)':83.5, '色域指数(Rg)':91.2, '褪黑素日光效率比(mel-DER)':0.32}
+
+labels_radar = list(params_day.keys())
+day_vals = list(params_day.values())
+night_vals = list(params_night.values())
+max_vals = [7000, 0.005, 100, 110, 1]
+
+day_norm = [v/m for v,m in zip(day_vals, max_vals)]
+night_norm = [v/m for v,m in zip(night_vals, max_vals)]
+
+angles = np.linspace(0, 2*np.pi, len(labels_radar), endpoint=False).tolist()
+day_norm += day_norm[:1]
+night_norm += night_norm[:1]
+angles += angles[:1]
+
+fig, ax = plt.subplots(figsize=(7,7), subplot_kw=dict(polar=True))
+ax.plot(angles, day_norm, label='日间模式', color='#1f77b4', linewidth=2)
+ax.fill(angles, day_norm, color='#1f77b4', alpha=0.25)
+ax.plot(angles, night_norm, label='夜间模式', color='#ff7f0e', linewidth=2)
+ax.fill(angles, night_norm, color='#ff7f0e', alpha=0.25)
+ax.set_thetagrids(np.degrees(angles[:-1]), labels_radar, fontproperties=my_font, fontsize=12)
+ax.set_title('关键参数雷达图（归一化）', fontproperties=my_font, fontsize=16)
+ax.legend(prop=my_font, fontsize=12, loc='upper right')
+plt.tight_layout()
+plt.show()
